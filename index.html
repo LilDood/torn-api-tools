@@ -6,7 +6,34 @@
             function onSaveClick() {
                 const apiKeyInput = document.getElementById("api-key-input");
                 localStorage[LS_API_KEY] = apiKeyInput.value;
-            }            
+            }
+
+            function loadRw() {
+                const request = new Request(`https://api.torn.com/torn/?selections=rankedwars&key=${localStorage[LS_API_KEY]}`);
+                fetch(request).then(async response => {
+                    const button = document.getElementById("rw-load").innerText = "Refresh";
+                    const container = document.getElementById("rw-container");
+
+                    for(let child of container.children) {
+                        container.removeChild(child);
+                    }
+
+                    const data = await response.json();
+                    
+                    for(let warId of Object.keys(data.rankedwars)) {
+                        const war = data.rankedwars[warId];
+                        const line = document.createElement("div");
+                        container.appendChild(line);
+
+                        const a = war.factions[Object.keys(war.factions)[0]];
+                        a.id = Object.keys(war.factions)[0];
+                        const b = war.factions[Object.keys(war.factions)[1]];
+                        b.id = Object.keys(war.factions)[1];
+
+                        line.innerHTML = `<a href="https://www.torn.com/factions.php?step=profile&ID=${a.id}">${a.name}</a> vs <a href="https://www.torn.com/factions.php?step=profile&ID=${b.id}">${b.name}</a>`;
+                    }
+                });
+            }
 
             function onReady() {
                 const key = localStorage[LS_API_KEY]
@@ -15,6 +42,9 @@
 
                 const saveButton = document.getElementById("api-key-save-button");
                 saveButton.addEventListener("click", onSaveClick);
+
+                const rwButton = document.getElementById("rw-load");
+                rwButton.addEventListener("click", loadRw);
             }
 
             window.addEventListener("DOMContentLoaded", onReady);
@@ -25,6 +55,13 @@
             <label for="key">API Key</label>
             <input name="key" id="api-key-input"/>
             <button type="button" id="api-key-save-button">Save Locally</button>
+        </div>
+        <div>
+            <h2>Ranked Wars</h2>
+            <button type="button" id="rw-load">Load</button>
+            <div id="rw-container">
+
+            </div>
         </div>
     </body>
 </html>
