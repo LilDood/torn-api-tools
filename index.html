@@ -1,0 +1,30 @@
+<html>
+    <head>
+        <script>
+            const LS_API_KEY = "torn_api_Key";
+            
+            function onSaveClick() {
+                const apiKeyInput = document.getElementById("api-key-input");
+                localStorage[LS_API_KEY] = apiKeyInput.value;
+            }            
+
+            function onReady() {
+                const key = localStorage[LS_API_KEY]
+                const apiKeyInput = document.getElementById("api-key-input");
+                apiKeyInput.value = key || "";
+
+                const saveButton = document.getElementById("api-key-save-button");
+                saveButton.addEventListener("click", onSaveClick);
+            }
+
+            window.addEventListener("DOMContentLoaded", onReady);
+        </script>
+    </head>
+    <body>
+        <div>
+            <label for="key">API Key</label>
+            <input name="key" id="api-key-input"/>
+            <button type="button" id="api-key-save-button">Save Locally</button>
+        </div>
+    </body>
+</html>
