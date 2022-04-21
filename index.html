@@ -30,7 +30,7 @@
                         const b = war.factions[Object.keys(war.factions)[1]];
                         b.id = Object.keys(war.factions)[1];
 
-                        line.innerHTML = `<a href="https://www.torn.com/factions.php?step=profile&ID=${a.id}">${a.name}</a> vs <a href="https://www.torn.com/factions.php?step=profile&ID=${b.id}">${b.name}</a>`;
+                        line.innerHTML = `<a href="https://www.torn.com/factions.php?step=profile&ID=${a.id}">${a.name}</a> vs <a href="https://www.torn.com/factions.php?step=profile&ID=${b.id}">${b.name}</a> starting ${new Date(war.war.start * 1000).toLocaleString()}`;
                     }
                 });
             }
