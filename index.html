@@ -2,6 +2,7 @@
     <head>
         <script>
             const LS_API_KEY = "torn_api_Key";
+            const LS_FLYER_LAST_FACTION = "flyer_last_faction";
             
             function onSaveClick() {
                 const apiKeyInput = document.getElementById("api-key-input");
@@ -13,10 +14,7 @@
                 fetch(request).then(async response => {
                     const button = document.getElementById("rw-load").innerText = "Refresh";
                     const container = document.getElementById("rw-container");
-
-                    for(let child of container.children) {
-                        container.removeChild(child);
-                    }
+                    container.innerHTML = "";
 
                     const data = await response.json();
 
@@ -42,6 +40,54 @@
                 });
             }
 
+            function loadFlyers() {
+                const input = document.getElementById("flyer-faction-input");
+                const faction_id = input.value;
+                localStorage[LS_FLYER_LAST_FACTION] = faction_id;
+                const request = new Request(`https://api.torn.com/faction/${faction_id}?selections=basic&key=${localStorage[LS_API_KEY]}`);
+                fetch(request).then(async response => {
+                    const button = document.getElementById("flyer-load").innerText = "Refresh";
+                    const container = document.getElementById("flyer-container");
+                    container.innerHTML = "";
+
+                    const data = await response.json();
+
+                    const title = document.createElement("h1");
+                    title.innerText = `Flyers for ${data.name}`;
+                    container.appendChild(title);
+
+                    const table = document.createElement("table");
+                    container.appendChild(table);
+
+                    const header = document.createElement("tr");
+                    table.appendChild(header);
+                    header.innerHTML = "<th>Name</th><th>Status</th>"
+                    
+                    for(let userId of Object.keys(data.members)) {
+                        const user = data.members[userId];
+                        user.id = userId;
+                        const line = document.createElement("tr");
+
+                        if(user.status.state === "Abroad" || user.status.state === "Traveling") {
+                            table.appendChild(line);
+                        }else if(user.status.state === "Hospital") {
+                            // Most of these are probably wrong for the "In a XXX Hospital statuses"
+                            // for(let country of ["Hawaiian", "Mexican", "Canadian", "Swiss", "South African", "Chinese", "Japanese", "Cayman Islands", "British", "Argentinian", "UAE"]) {
+                            //     if(user.status.description.includes(country)) {
+                            //         // Add users in foreign hospital
+                            //         table.appendChild(line);
+                            //     }
+                            // }
+                            if(user.status.description.startsWith("In a")) {
+                                table.appendChild(line);
+                            }
+                        }
+
+                        line.innerHTML = `<td><a href="https://www.torn.com/profiles.php?XID=${userId}">${user.name}</a></td><td>${user.status.description}</td>`;
+                    }
+                });
+            }
+
             function onReady() {
                 const key = localStorage[LS_API_KEY]
                 const apiKeyInput = document.getElementById("api-key-input");
@@ -52,6 +98,11 @@
 
                 const rwButton = document.getElementById("rw-load");
                 rwButton.addEventListener("click", loadRw);
+
+                const flyerButton = document.getElementById("flyer-load");
+                flyerButton.addEventListener("click", loadFlyers);
+                const flyerInput = document.getElementById("flyer-faction-input");
+                flyerInput.value = localStorage[LS_FLYER_LAST_FACTION] || "";
             }
 
             window.addEventListener("DOMContentLoaded", onReady);
@@ -67,6 +118,15 @@
             <h2>Ranked Wars</h2>
             <button type="button" id="rw-load">Load</button>
             <div id="rw-container">
+
+            </div>
+        </div>
+        <div>
+            <h2>Flyer Tracker</h2>
+            <label for="flyer-faction-id">Faction ID</label>
+            <input name="flyer-faction-id" id="flyer-faction-input"/>
+            <button type="button" id="flyer-load">Load</button>
+            <div id="flyer-container">
 
             </div>
         </div>
