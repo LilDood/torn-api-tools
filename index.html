@@ -19,18 +19,25 @@
                     }
 
                     const data = await response.json();
+
+                    const table = document.createElement("table");
+                    container.appendChild(table);
+
+                    const header = document.createElement("tr");
+                    table.appendChild(header);
+                    header.innerHTML = "<th>Faction A</th><th>Faction B</th><th>Start Time</th>"
                     
                     for(let warId of Object.keys(data.rankedwars)) {
                         const war = data.rankedwars[warId];
-                        const line = document.createElement("div");
-                        container.appendChild(line);
+                        const line = document.createElement("tr");
+                        table.appendChild(line);
 
                         const a = war.factions[Object.keys(war.factions)[0]];
                         a.id = Object.keys(war.factions)[0];
                         const b = war.factions[Object.keys(war.factions)[1]];
                         b.id = Object.keys(war.factions)[1];
 
-                        line.innerHTML = `<a href="https://www.torn.com/factions.php?step=profile&ID=${a.id}">${a.name}</a> vs <a href="https://www.torn.com/factions.php?step=profile&ID=${b.id}">${b.name}</a> starting ${new Date(war.war.start * 1000).toLocaleString()}`;
+                        line.innerHTML = `<td><a href="https://www.torn.com/factions.php?step=profile&ID=${a.id}">${a.name}</a></td><td><a href="https://www.torn.com/factions.php?step=profile&ID=${b.id}">${b.name}</a></td><td>${new Date(war.war.start * 1000).toLocaleString()}</td>`;
                     }
                 });
             }
@@ -54,7 +61,7 @@
         <div>
             <label for="key">API Key</label>
             <input name="key" id="api-key-input"/>
-            <button type="button" id="api-key-save-button">Save Locally</button>
+            <button type="button" id="api-key-save-button">Save in Browser</button>
         </div>
         <div>
             <h2>Ranked Wars</h2>
