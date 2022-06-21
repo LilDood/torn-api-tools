@@ -145,9 +145,9 @@
 
                     const header = document.createElement("tr");
                     table.appendChild(header);
-                    header.innerHTML = "<th>Faction A</th><th>Faction B</th><th>Start Time</th>"
+                    header.innerHTML = "<th>Faction A</th><th>Faction B</th><th>Start Time (TCT)</th><th>Start Time (Local)</th>"
                     
-                    for(let warId of Object.keys(data.rankedwars)) {
+                    for(let warId of Object.keys(data.rankedwars).sort((a, b) => { return data.rankedwars[a].war.start - data.rankedwars[b].war.start})) {
                         const war = data.rankedwars[warId];
                         const line = document.createElement("tr");
                         table.appendChild(line);
@@ -157,7 +157,7 @@
                         const b = war.factions[Object.keys(war.factions)[1]];
                         b.id = Object.keys(war.factions)[1];
 
-                        line.innerHTML = `<td><a href="https://www.torn.com/factions.php?step=profile&ID=${a.id}">${a.name} [${a.id}]</a></td><td><a href="https://www.torn.com/factions.php?step=profile&ID=${b.id}">${b.name} [${b.id}]</a></td><td>${new Date(war.war.start * 1000).toLocaleString()}</td>`;
+                        line.innerHTML = `<td><a href="https://www.torn.com/factions.php?step=profile&ID=${a.id}">${a.name} [${a.id}]</a></td><td><a href="https://www.torn.com/factions.php?step=profile&ID=${b.id}">${b.name} [${b.id}]</a></td><td>${new Date(war.war.start * 1000).toLocaleString([], { timeZone: "UTC"})}</td><td>${new Date(war.war.start * 1000).toLocaleString()}</td>`;
                     }
                 });
             }
