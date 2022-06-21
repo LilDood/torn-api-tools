@@ -87,25 +87,23 @@
                 localStorage[LS_API_KEY] = apiKeyInput.value;
             }
 
-            function checkApiKey() {
+            async function checkApiKey() {
                 const clearButton = document.getElementById("api-key-clear-button");
                 clearButton.classList.remove("hidden");
                 const container = document.getElementById("api-key-container");
                 container.innerHTML = "";
 
                 const keyInfoRequest = new Request(`https://api.torn.com/key/?selections=info&key=${getApiKey()}`);
-                fetch(keyInfoRequest).then(async response => {
-                    const data = await response.json();
+                const keyInfoResponse = await fetch(keyInfoRequest);
+                const data = await keyInfoResponse.json();
 
-                    container.innerHTML += `<p>API Key Access Level <span class="badge api-key-${data['access_type'].toLowerCase().split(' ')[0]}"></span></p>`
-                });
+                container.innerHTML += `<p>API Key Access Level <span class="badge api-key-${data['access_type'].toLowerCase().split(' ')[0]}"></span></p>`
 
                 const userProfileRequest = new Request(`https://api.torn.com/user/?selections=basic&key=${getApiKey()}`);
-                fetch(userProfileRequest).then(async response => {
-                    const user = await response.json();
+                const userProfileResponse = await fetch(userProfileRequest);
+                const user = await userProfileResponse.json();
 
-                    container.innerHTML += `<p>API Key is for <a href="https://www.torn.com/profiles.php?XID=${user.player_id}">${user.name} [${user.player_id}]</a></p>`
-                });
+                container.innerHTML += `<p>API Key is for <a href="https://www.torn.com/profiles.php?XID=${user.player_id}">${user.name} [${user.player_id}]</a></p>`
             }
 
             function clearApiKey() {
@@ -128,38 +126,37 @@
                 container.innerHTML = "";    
             }
 
-            function loadRw() {
+            async function loadRw() {
                 const request = new Request(`https://api.torn.com/torn/?selections=rankedwars&key=${getApiKey()}`);
-                fetch(request).then(async response => {
-                    const button = document.getElementById("rw-load").innerText = "Refresh";
-                    const clearButton = document.getElementById("rw-clear");
-                    clearButton.classList.remove("hidden");
-                    const container = document.getElementById("rw-container");
-                    container.innerHTML = "";
+                const response = await fetch(request);
+                const button = document.getElementById("rw-load").innerText = "Refresh";
+                const clearButton = document.getElementById("rw-clear");
+                clearButton.classList.remove("hidden");
+                const container = document.getElementById("rw-container");
+                container.innerHTML = "";
 
-                    const data = await response.json();
+                const data = await response.json();
 
-                    const table = document.createElement("table");
-                    table.className = "pure-table-horizontal pure-table-striped";
-                    container.appendChild(table);
+                const table = document.createElement("table");
+                table.className = "pure-table-horizontal pure-table-striped";
+                container.appendChild(table);
 
-                    const header = document.createElement("tr");
-                    table.appendChild(header);
-                    header.innerHTML = "<th>Faction A</th><th>Faction B</th><th>Start Time (TCT)</th><th>Start Time (Local)</th>"
-                    
-                    for(let warId of Object.keys(data.rankedwars).sort((a, b) => { return data.rankedwars[a].war.start - data.rankedwars[b].war.start})) {
-                        const war = data.rankedwars[warId];
-                        const line = document.createElement("tr");
-                        table.appendChild(line);
+                const header = document.createElement("tr");
+                table.appendChild(header);
+                header.innerHTML = "<th>Faction A</th><th>Faction B</th><th>Start Time (TCT)</th><th>Start Time (Local)</th>"
+                
+                for(let warId of Object.keys(data.rankedwars).sort((a, b) => { return data.rankedwars[a].war.start - data.rankedwars[b].war.start})) {
+                    const war = data.rankedwars[warId];
+                    const line = document.createElement("tr");
+                    table.appendChild(line);
 
-                        const a = war.factions[Object.keys(war.factions)[0]];
-                        a.id = Object.keys(war.factions)[0];
-                        const b = war.factions[Object.keys(war.factions)[1]];
-                        b.id = Object.keys(war.factions)[1];
+                    const a = war.factions[Object.keys(war.factions)[0]];
+                    a.id = Object.keys(war.factions)[0];
+                    const b = war.factions[Object.keys(war.factions)[1]];
+                    b.id = Object.keys(war.factions)[1];
 
-                        line.innerHTML = `<td><a href="https://www.torn.com/factions.php?step=profile&ID=${a.id}">${a.name} [${a.id}]</a></td><td><a href="https://www.torn.com/factions.php?step=profile&ID=${b.id}">${b.name} [${b.id}]</a></td><td>${new Date(war.war.start * 1000).toLocaleString([], { timeZone: "UTC"})}</td><td>${new Date(war.war.start * 1000).toLocaleString()}</td>`;
-                    }
-                });
+                    line.innerHTML = `<td><a href="https://www.torn.com/factions.php?step=profile&ID=${a.id}">${a.name} [${a.id}]</a></td><td><a href="https://www.torn.com/factions.php?step=profile&ID=${b.id}">${b.name} [${b.id}]</a></td><td>${new Date(war.war.start * 1000).toLocaleString([], { timeZone: "UTC"})}</td><td>${new Date(war.war.start * 1000).toLocaleString()}</td>`;
+                }
             }
 
             function clearFlyers() {
@@ -170,55 +167,54 @@
                 container.innerHTML = "";
             }
 
-            function loadFlyers() {
+            async function loadFlyers() {
                 const input = document.getElementById("flyer-faction-input");
                 const faction_id = input.value;
                 localStorage[LS_FLYER_LAST_FACTION] = faction_id;
                 const request = new Request(`https://api.torn.com/faction/${faction_id}?selections=basic&key=${getApiKey()}`);
-                fetch(request).then(async response => {
-                    const button = document.getElementById("flyer-load").innerText = "Refresh";
-                    const clearButton = document.getElementById("flyer-clear");
-                    clearButton.classList.remove("hidden");
-                    const container = document.getElementById("flyer-container");
-                    container.innerHTML = "";
+                const response = await fetch(request);
+                const button = document.getElementById("flyer-load").innerText = "Refresh";
+                const clearButton = document.getElementById("flyer-clear");
+                clearButton.classList.remove("hidden");
+                const container = document.getElementById("flyer-container");
+                container.innerHTML = "";
 
-                    const data = await response.json();
+                const data = await response.json();
 
-                    const title = document.createElement("h1");
-                    title.innerText = `Flyers for ${data.name}`;
-                    container.appendChild(title);
+                const title = document.createElement("h1");
+                title.innerText = `Flyers for ${data.name}`;
+                container.appendChild(title);
 
-                    const table = document.createElement("table");
-                    table.className = "pure-table-horizontal pure-table-striped";
-                    container.appendChild(table);
+                const table = document.createElement("table");
+                table.className = "pure-table-horizontal pure-table-striped";
+                container.appendChild(table);
 
-                    const header = document.createElement("tr");
-                    table.appendChild(header);
-                    header.innerHTML = "<th>Name</th><th>Status</th>"
-                    
-                    for(let userId of Object.keys(data.members)) {
-                        const user = data.members[userId];
-                        user.id = userId;
-                        const line = document.createElement("tr");
+                const header = document.createElement("tr");
+                table.appendChild(header);
+                header.innerHTML = "<th>Name</th><th>Status</th>"
+                
+                for(let userId of Object.keys(data.members)) {
+                    const user = data.members[userId];
+                    user.id = userId;
+                    const line = document.createElement("tr");
 
-                        if(user.status.state === "Abroad" || user.status.state === "Traveling") {
+                    if(user.status.state === "Abroad" || user.status.state === "Traveling") {
+                        table.appendChild(line);
+                    }else if(user.status.state === "Hospital") {
+                        // Most of these are probably wrong for the "In a XXX Hospital statuses"
+                        // for(let country of ["Hawaiian", "Mexican", "Canadian", "Swiss", "South African", "Chinese", "Japanese", "Cayman Islands", "British", "Argentinian", "UAE"]) {
+                        //     if(user.status.description.includes(country)) {
+                        //         // Add users in foreign hospital
+                        //         table.appendChild(line);
+                        //     }
+                        // }
+                        if(user.status.description.startsWith("In a")) {
                             table.appendChild(line);
-                        }else if(user.status.state === "Hospital") {
-                            // Most of these are probably wrong for the "In a XXX Hospital statuses"
-                            // for(let country of ["Hawaiian", "Mexican", "Canadian", "Swiss", "South African", "Chinese", "Japanese", "Cayman Islands", "British", "Argentinian", "UAE"]) {
-                            //     if(user.status.description.includes(country)) {
-                            //         // Add users in foreign hospital
-                            //         table.appendChild(line);
-                            //     }
-                            // }
-                            if(user.status.description.startsWith("In a")) {
-                                table.appendChild(line);
-                            }
                         }
-
-                        line.innerHTML = `<td><a href="https://www.torn.com/profiles.php?XID=${userId}">${user.name} [${userId}]</a></td><td>${user.status.description}</td>`;
                     }
-                });
+
+                    line.innerHTML = `<td><a href="https://www.torn.com/profiles.php?XID=${userId}">${user.name} [${userId}]</a></td><td>${user.status.description}</td>`;
+                }
             }
 
             function onReady() {
