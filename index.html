@@ -87,10 +87,20 @@
                 localStorage[LS_API_KEY] = apiKeyInput.value;
             }
 
+            function clearRw() {
+                const button = document.getElementById("rw-load").innerText = "Load";
+                const clearButton = document.getElementById("rw-clear");
+                clearButton.classList.add("hidden");
+                const container = document.getElementById("rw-container");
+                container.innerHTML = "";    
+            }
+
             function loadRw() {
                 const request = new Request(`https://api.torn.com/torn/?selections=rankedwars&key=${localStorage[LS_API_KEY]}`);
                 fetch(request).then(async response => {
                     const button = document.getElementById("rw-load").innerText = "Refresh";
+                    const clearButton = document.getElementById("rw-clear");
+                    clearButton.classList.remove("hidden");
                     const container = document.getElementById("rw-container");
                     container.innerHTML = "";
 
@@ -119,6 +129,14 @@
                 });
             }
 
+            function clearFlyers() {
+                const button = document.getElementById("flyer-load").innerText = "Load";
+                const clearButton = document.getElementById("flyer-clear");
+                clearButton.classList.add("hidden");
+                const container = document.getElementById("flyer-container");
+                container.innerHTML = "";
+            }
+
             function loadFlyers() {
                 const input = document.getElementById("flyer-faction-input");
                 const faction_id = input.value;
@@ -126,6 +144,8 @@
                 const request = new Request(`https://api.torn.com/faction/${faction_id}?selections=basic&key=${localStorage[LS_API_KEY]}`);
                 fetch(request).then(async response => {
                     const button = document.getElementById("flyer-load").innerText = "Refresh";
+                    const clearButton = document.getElementById("flyer-clear");
+                    clearButton.classList.remove("hidden");
                     const container = document.getElementById("flyer-container");
                     container.innerHTML = "";
 
@@ -176,11 +196,15 @@
                 const saveButton = document.getElementById("api-key-save-button");
                 saveButton.addEventListener("click", onSaveClick);
 
-                const rwButton = document.getElementById("rw-load");
-                rwButton.addEventListener("click", loadRw);
+                const rwLoadButton = document.getElementById("rw-load");
+                rwLoadButton.addEventListener("click", loadRw);
+                const rwClearButton = document.getElementById("rw-clear");
+                rwClearButton.addEventListener("click", clearRw);
 
-                const flyerButton = document.getElementById("flyer-load");
-                flyerButton.addEventListener("click", loadFlyers);
+                const flyerLoadButton = document.getElementById("flyer-load");
+                flyerLoadButton.addEventListener("click", loadFlyers);
+                const flyerClearButton = document.getElementById("flyer-clear");
+                flyerClearButton.addEventListener("click", clearFlyers);
                 const flyerInput = document.getElementById("flyer-faction-input");
                 flyerInput.value = localStorage[LS_FLYER_LAST_FACTION] || "";
             }
@@ -204,6 +228,7 @@
 
                 <h2 class="content-subhead">All Ranked Wars<span class="badge api-key-public"></span></h2>
                 <button class="pure-button" type="button" id="rw-load">Load</button>
+                <button class="pure-button hidden" type="button" id="rw-clear">Clear</button>
                 <div id="rw-container">
 
                 </div>
@@ -213,6 +238,7 @@
                     <label for="flyer-faction-id">Faction ID</label>
                     <input name="flyer-faction-id" id="flyer-faction-input"/>
                     <button class="pure-button" type="button" id="flyer-load">Load</button>
+                    <button class="pure-button hidden" type="button" id="flyer-clear">Clear</button>
                 </form>
                 <div id="flyer-container">
 
