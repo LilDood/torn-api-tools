@@ -8,6 +8,34 @@
                 border: solid 1px black;
                 padding: 3px;
             }
+            span.badge:after {
+                border-radius: 4px;
+                background-color: gray;
+                vertical-align: middle;
+                padding: 4px;
+                font-size: 10px;
+                margin-left: 6px;
+            }
+            span.badge.api-key-public:after {
+                content: "Public";
+                background-color: lightgray;
+                color: black;
+            }
+            span.badge.api-key-minimal:after {
+                content: "Minimal";
+                background-color: green;
+                color: white;
+            }
+            span.badge.api-key-Limited:after {
+                content: "Limited";
+                background-color: yellow;
+                color: black;
+            }
+            span.badge.api-key-full:after {
+                content: "Full";
+                background-color: red;
+                color: white;
+            }
         </style>
         <script>
             const LS_API_KEY = "torn_api_Key";
@@ -124,14 +152,14 @@
             <button type="button" id="api-key-save-button">Save in Browser</button>
         </div>
         <div>
-            <h2>Ranked Wars</h2>
+            <h2>Ranked Wars<span class="badge api-key-public"></span></h2>
             <button type="button" id="rw-load">Load</button>
             <div id="rw-container">
 
             </div>
         </div>
         <div>
-            <h2>Flyer Tracker</h2>
+            <h2>Flyer Tracker<span class="badge api-key-public"></h2>
             <label for="flyer-faction-id">Faction ID</label>
             <input name="flyer-faction-id" id="flyer-faction-input"/>
             <button type="button" id="flyer-load">Load</button>
