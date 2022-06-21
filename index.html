@@ -3,7 +3,7 @@
         <link rel="stylesheet" href="https://unpkg.com/purecss@2.1.0/build/pure-min.css" integrity="sha384-yHIFVG6ClnONEA5yB5DJXfW2/KC173DIQrYoZMEtBvGzmf0PKiGyNEqe9N6BNDBH" crossorigin="anonymous">
         <style>
             body {
-                color: #777;
+                color: #555;
             }
             .content {
                 margin: 0 auto;
@@ -26,14 +26,14 @@
             }
             .header h2 {
                 font-weight: 300;
-                color: #ccc;
+                color: #777;
                 padding: 0;
                 margin-top: 0;
             }
             .content-subhead {
                 margin: 50px 0 20px 0;
                 font-weight: 300;
-                color: #888;
+                color: #444;
             }
             @media (min-width: 48em) {
                 .header,
@@ -69,7 +69,7 @@
             }
             span.badge.api-key-Limited:after {
                 content: "Limited";
-                background-color: yellow;
+                background-color: orange;
                 color: black;
             }
             span.badge.api-key-full:after {
@@ -82,9 +82,42 @@
             const LS_API_KEY = "torn_api_Key";
             const LS_FLYER_LAST_FACTION = "flyer_last_faction";
             
-            function onSaveClick() {
+            function saveApiKey() {
                 const apiKeyInput = document.getElementById("api-key-input");
                 localStorage[LS_API_KEY] = apiKeyInput.value;
+            }
+
+            function checkApiKey() {
+                const clearButton = document.getElementById("api-key-clear-button");
+                clearButton.classList.remove("hidden");
+                const container = document.getElementById("api-key-container");
+                container.innerHTML = "";
+
+                const keyInfoRequest = new Request(`https://api.torn.com/key/?selections=info&key=${getApiKey()}`);
+                fetch(keyInfoRequest).then(async response => {
+                    const data = await response.json();
+
+                    container.innerHTML += `<p>API Key Access Level <span class="badge api-key-${data['access_type'].toLowerCase().split(' ')[0]}"></span></p>`
+                });
+
+                const userProfileRequest = new Request(`https://api.torn.com/user/?selections=basic&key=${getApiKey()}`);
+                fetch(userProfileRequest).then(async response => {
+                    const user = await response.json();
+
+                    container.innerHTML += `<p>API Key is for <a href="https://www.torn.com/profiles.php?XID=${user.player_id}">${user.name} [${user.player_id}]</a></p>`
+                });
+            }
+
+            function clearApiKey() {
+                const clearButton = document.getElementById("api-key-clear-button");
+                clearButton.classList.add("hidden");
+                const container = document.getElementById("api-key-container");
+                container.innerHTML = "";    
+            }
+
+            function getApiKey() {
+                const apiKeyInput = document.getElementById("api-key-input");
+                return apiKeyInput.value || localStorage[LS_API_KEY];
             }
 
             function clearRw() {
@@ -96,7 +129,7 @@
             }
 
             function loadRw() {
-                const request = new Request(`https://api.torn.com/torn/?selections=rankedwars&key=${localStorage[LS_API_KEY]}`);
+                const request = new Request(`https://api.torn.com/torn/?selections=rankedwars&key=${getApiKey()}`);
                 fetch(request).then(async response => {
                     const button = document.getElementById("rw-load").innerText = "Refresh";
                     const clearButton = document.getElementById("rw-clear");
@@ -141,7 +174,7 @@
                 const input = document.getElementById("flyer-faction-input");
                 const faction_id = input.value;
                 localStorage[LS_FLYER_LAST_FACTION] = faction_id;
-                const request = new Request(`https://api.torn.com/faction/${faction_id}?selections=basic&key=${localStorage[LS_API_KEY]}`);
+                const request = new Request(`https://api.torn.com/faction/${faction_id}?selections=basic&key=${getApiKey()}`);
                 fetch(request).then(async response => {
                     const button = document.getElementById("flyer-load").innerText = "Refresh";
                     const clearButton = document.getElementById("flyer-clear");
@@ -193,8 +226,12 @@
                 const apiKeyInput = document.getElementById("api-key-input");
                 apiKeyInput.value = key || "";
 
-                const saveButton = document.getElementById("api-key-save-button");
-                saveButton.addEventListener("click", onSaveClick);
+                const apiKeySaveButton = document.getElementById("api-key-save-button");
+                apiKeySaveButton.addEventListener("click", saveApiKey);
+                const apiKeyCheckButton = document.getElementById("api-key-check-button");
+                apiKeyCheckButton.addEventListener("click", checkApiKey);
+                const apiKeyClearButton = document.getElementById("api-key-clear-button");
+                apiKeyClearButton.addEventListener("click", clearApiKey);
 
                 const rwLoadButton = document.getElementById("rw-load");
                 rwLoadButton.addEventListener("click", loadRw);
@@ -224,7 +261,12 @@
                     <label for="key">API Key</label>
                     <input name="key" id="api-key-input"/>
                     <button class="pure-button" type="button" id="api-key-save-button">Save in Browser</button>
+                    <button class="pure-button" type="button" id="api-key-check-button">Check</button>
+                    <button class="pure-button hidden" type="button" id="api-key-clear-button">Clear</button>
                 </form>
+                <div id="api-key-container">
+
+                </div>
 
                 <h2 class="content-subhead">All Ranked Wars<span class="badge api-key-public"></span></h2>
                 <button class="pure-button" type="button" id="rw-load">Load</button>
