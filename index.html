@@ -83,6 +83,12 @@
             const LS_API_KEY = "torn_api_Key";
             const LS_FLYER_LAST_FACTION = "flyer_last_faction";
 
+            const accessLevelBadge = {
+                view: function(vnode) {
+                    return m("span", { class: `badge api-key-${vnode.attrs['level'].toLowerCase().split(' ')[0]}` })
+                }
+            }
+
             const configuration = {
                 view: function(vnode) {
                     return [m("h2[class=content-subhead]", "Configuration"), vnode.children];
@@ -105,12 +111,10 @@
                 async function check() {
                     const data = await m.request({ url: `https://api.torn.com/key/?selections=info&key=${getApiKey()}` });
 
-                    //container.innerHTML += `<p>API Key Access Level <span class="badge api-key-${data['access_type'].toLowerCase().split(' ')[0]}"></span></p>`
-
                     const user = await m.request({ url: `https://api.torn.com/user/?selections=basic&key=${getApiKey()}` });
 
                     content = m("div", [
-                        m("p", ["API Key Access Level ", null]),
+                        m("p", ["API Key Access Level", m(accessLevelBadge, { level: data['access_type'] })]),
                         m("p", ["API Key is for ", m("a", { href: `https://www.torn.com/profiles.php?XID=${user.player_id}` }, `${user.name} [${user.player_id}]`)])
                     ]);
                 }
