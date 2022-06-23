@@ -89,6 +89,11 @@
                 }
             }
 
+            const accessLevelBadgePublic = m(accessLevelBadge, { level: "public" });
+            const accessLevelBadgeMinimal = m(accessLevelBadge, { level: "minimal" });
+            const accessLevelBadgeLimited = m(accessLevelBadge, { level: "limited" });
+            const accessLevelBadgeFull = m(accessLevelBadge, { level: "full" });
+
             const configuration = {
                 view: function(vnode) {
                     return [m("h2[class=content-subhead]", "Configuration"), vnode.children];
@@ -220,8 +225,7 @@
                 return {
                     view: function() {
                         return [
-                            m("h2.content-subhead", "Ranked War List"),
-                            " ",
+                            m("h2.content-subhead", ["Ranked War List", accessLevelBadgePublic]),
                             m("button.pure-button[type=button]", { onclick: load }, !!wars ? "Refresh" : "Load"),
                             " ",
                             m("button.pure-button[type=button]", { onclick: clear, class: !!content ? null : "hidden" }, "Clear"),
@@ -271,6 +275,75 @@
                     line.innerHTML = `<td><a href="https://www.torn.com/factions.php?step=profile&ID=${a.id}">${a.name} [${a.id}]</a></td><td><a href="https://www.torn.com/factions.php?step=profile&ID=${b.id}">${b.name} [${b.id}]</a></td><td>${new Date(war.war.start * 1000).toLocaleString([], { timeZone: "UTC"})}</td><td>${new Date(war.war.start * 1000).toLocaleString()}</td>`;
                 }
             }
+
+            const listFactionFlyers = function() {
+                let factionId = localStorage[LS_FLYER_LAST_FACTION];
+                let members = null;
+                let content = null;
+
+                function input(event) {
+                    factionId = event.target.value;
+                }
+
+                async function load() {
+                    localStorage[LS_FLYER_LAST_FACTION] = factionId;
+                    const input = document.getElementById("flyer-faction-input");
+                    const data = await m.request({ url: `https://api.torn.com/faction/${factionId}?selections=basic&key=${getApiKey()}` });
+
+                    content = [
+                        m("h1", `Flyers for ${data.name}`),
+                        m("table.pure-table-horizontal.pure-table-striped", [
+                            m("tr", [m("th", "Name"), m("th", "Status")]),
+                            ...Object.keys(data.members).map(userId => {
+                                const user = data.members[userId];
+                                
+                                if(user.status.state !== "Abroad" && user.status.state !== "Traveling" && user.status.state !== "Hospital") {
+                                    return;
+                                }else if(user.status.state === "Hospital") {
+                                    // Most of these are probably wrong for the "In a XXX Hospital statuses"
+                                    // for(let country of ["Hawaiian", "Mexican", "Canadian", "Swiss", "South African", "Chinese", "Japanese", "Cayman Islands", "British", "Argentinian", "UAE"]) {
+                                    //     if(user.status.description.includes(country)) {
+                                    //         // Add users in foreign hospital
+                                    //         table.appendChild(line);
+                                    //     }
+                                    // }
+                                    if(!user.status.description.startsWith("In a")) {
+                                        return;
+                                    }
+                                }
+
+                                return m("tr", [
+                                    m("td", m("a", { href: `https://www.torn.com/profiles.php?XID=${userId}` }, `${user.name} [${userId}]`)),
+                                    m("td", `${user.status.description}`)
+                                ]);
+                            })
+                        ])
+                    ];
+                }
+
+                function clear() {
+                    members = null;
+                    content = null;
+                }
+
+                return {
+                    view: function() {
+                        return [
+                            m("h2.content-subhead", ["Faction Flyers", accessLevelBadgePublic]),
+                            m("form[class=pure-form]", [
+                                m("label[for=flyersFactionId]", "Faction ID"),
+                                " ",
+                                m("input[name=flyersFactionId]", { oninput: input, value: factionId }),
+                                " ",
+                                m("button[class=pure-button][type=button]", { onclick: load }, "Load"),
+                                " ",
+                                m("button[class=pure-button][type=button]", { onclick: clear, class: !!content ? null : "hidden" }, "Clear")
+                            ]),
+                            content
+                        ];
+                    }
+                }
+            }();
 
             function clearFlyers() {
                 const button = document.getElementById("flyer-load").innerText = "Load";
@@ -359,7 +432,8 @@
                     view: function() {
                         return [
                             m(configuration, [m(configureApiKey)]),
-                            m(listRankedWars)
+                            m(listRankedWars),
+                            m(listFactionFlyers)
                         ];
                     }
                 });
