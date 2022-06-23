@@ -180,6 +180,57 @@
                 return apiKeyInput.value || localStorage[LS_API_KEY];
             }
 
+            const listRankedWars = function() {
+                let wars = null;
+                let content = null;
+
+                async function load() {
+                    const data = await m.request(`https://api.torn.com/torn/?selections=rankedwars&key=${getApiKey()}`);
+                    wars = Object.keys(data.rankedwars).map(id => {
+                        return {
+                            id,
+                            ...data.rankedwars[id]
+                        };
+                    });
+
+                    content = m("table.pure-table-horizontal.pure-table-striped", 
+                        [m("tr", [m("th", "Faction A"), m("th", "Faction B"), m("th", "Start Time (TCT)"), m("th", "Start Time (Local)"), m("th", "Winner")])].concat( 
+                        wars.sort((a, b) => a.war.start - b.war.start).map(war => {
+                            const aId = Object.keys(war.factions)[0];
+                            const a = {...war.factions[aId]};
+                            const bId = Object.keys(war.factions)[1];
+                            const b = {...war.factions[bId]};
+
+                            return m("tr", [
+                                m("td", m("a", { href: `https://www.torn.com/factions.php?step=profile&ID=${aId}`}, `${a.name} [${aId}]`)),
+                                m("td", m("a", { href: `https://www.torn.com/factions.php?step=profile&ID=${bId}`}, `${b.name} [${bId}]`)),
+                                m("td", new Date(war.war.start * 1000).toLocaleString([], { timeZone: "UTC"})),
+                                m("td", new Date(war.war.start * 1000).toLocaleString()),
+                                m("td", war.war.winner ? war.factions[war.war.winner].name : "-")
+                            ])
+                        }))
+                    );
+                }
+
+                function clear() {
+                    wars = null;
+                    content = null;
+                }
+
+                return {
+                    view: function() {
+                        return [
+                            m("h2.content-subhead", "Ranked War List"),
+                            " ",
+                            m("button.pure-button[type=button]", { onclick: load }, !!wars ? "Refresh" : "Load"),
+                            " ",
+                            m("button.pure-button[type=button]", { onclick: clear, class: !!content ? null : "hidden" }, "Clear"),
+                            m("div", content)
+                        ];
+                    }
+                }
+            }();
+
             function clearRw() {
                 const button = document.getElementById("rw-load").innerText = "Load";
                 const clearButton = document.getElementById("rw-clear");
@@ -306,7 +357,10 @@
                 const root = document.querySelector("div.content");
                 m.mount(root, {
                     view: function() {
-                        return m(configuration, [m(configureApiKey)]);
+                        return [
+                            m(configuration, [m(configureApiKey)]),
+                            m(listRankedWars)
+                        ];
                     }
                 });
             }
