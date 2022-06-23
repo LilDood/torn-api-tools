@@ -1,6 +1,7 @@
 <html>
     <head>
         <link rel="stylesheet" href="https://unpkg.com/purecss@2.1.0/build/pure-min.css" integrity="sha384-yHIFVG6ClnONEA5yB5DJXfW2/KC173DIQrYoZMEtBvGzmf0PKiGyNEqe9N6BNDBH" crossorigin="anonymous">
+        <script src="https://unpkg.com/mithril/mithril.js"></script>
         <style>
             body {
                 color: #555;
@@ -81,6 +82,62 @@
         <script>
             const LS_API_KEY = "torn_api_Key";
             const LS_FLYER_LAST_FACTION = "flyer_last_faction";
+
+            const configuration = {
+                view: function(vnode) {
+                    return [m("h2[class=content-subhead]", "Configuration"), vnode.children];
+                    return m("article", [m("h2[class=content-subhead]", "Configuration"), vnode.children]);
+                }
+            }
+
+            const configureApiKey = function() {
+                let value = localStorage[LS_API_KEY];
+                let content = null;
+
+                function input(event) {
+                    value = event.target.value;
+                }
+
+                function save() {
+                    localStorage[LS_API_KEY] = value;
+                }
+
+                async function check() {
+                    const data = await m.request({ url: `https://api.torn.com/key/?selections=info&key=${getApiKey()}` });
+
+                    //container.innerHTML += `<p>API Key Access Level <span class="badge api-key-${data['access_type'].toLowerCase().split(' ')[0]}"></span></p>`
+
+                    const user = await m.request({ url: `https://api.torn.com/user/?selections=basic&key=${getApiKey()}` });
+
+                    content = m("div", [
+                        m("p", ["API Key Access Level ", null]),
+                        m("p", ["API Key is for ", m("a", { href: `https://www.torn.com/profiles.php?XID=${user.player_id}` }, `${user.name} [${user.player_id}]`)])
+                    ]);
+                }
+
+                function clear() {
+                    content = null;
+                }
+
+                return {
+                    view: function() {
+                        return [m("form[class=pure-form]", [
+                            m("label[for=apiKey]", "API Key"),
+                            " ",
+                            m("input[name=apiKey]", { oninput: input, value: value }),
+                            " ",
+                            m("button[class=pure-button][type=button]", { onclick: save }, "Save in Browser"),
+                            " ",
+                            m("button[class=pure-button][type=button]", { onclick: check }, "Check"),
+                            " ",
+                            m("button[class=pure-button][type=button]", { onclick: clear, class: !!content ? null : "hidden" }, "Clear")
+                        ]), content];
+                    },
+                    getValue: function() {
+                        return value;
+                    }
+                }
+            }();
             
             function saveApiKey() {
                 const apiKeyInput = document.getElementById("api-key-input");
@@ -114,6 +171,7 @@
             }
 
             function getApiKey() {
+                return configureApiKey.getValue();
                 const apiKeyInput = document.getElementById("api-key-input");
                 return apiKeyInput.value || localStorage[LS_API_KEY];
             }
@@ -240,6 +298,13 @@
                 flyerClearButton.addEventListener("click", clearFlyers);
                 const flyerInput = document.getElementById("flyer-faction-input");
                 flyerInput.value = localStorage[LS_FLYER_LAST_FACTION] || "";
+
+                const root = document.querySelector("div.content");
+                m.mount(root, {
+                    view: function() {
+                        return m(configuration, [m(configureApiKey)]);
+                    }
+                });
             }
 
             window.addEventListener("DOMContentLoaded", onReady);
