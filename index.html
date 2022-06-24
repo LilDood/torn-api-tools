@@ -87,6 +87,33 @@
                 return configureApiKey.getValue();
             }
 
+            async function tornGet(endpoint, selections, params) {
+                const url = new URL("https://api.torn.com");
+
+                url.pathname = endpoint
+                url.searchParams.append("key", configureApiKey.getValue());
+                url.searchParams.append("selections", selections);
+
+                params = params || {};
+                const paramsEntries = typeof params === "URLSearchParams" ? params.entries() : Object.entries(params);
+                for(const [key, value] of paramsEntries) {
+                    url.searchParams.append(key, value);
+                }
+
+                const response = await m.request({url: url});
+
+                if(response['error']) {
+                    const err = response['error'];
+                    const message = `Error code ${err.code} ${err.error}`;
+                    configureApiKey.setError(message);
+                    throw new Error(message);
+                }else{
+                    configureApiKey.setError(null);
+                }
+
+                return response;
+            }
+
             const accessLevelBadge = {
                 view: function(vnode) {
                     return m("span", { class: `badge api-key-${vnode.attrs['level'].toLowerCase().split(' ')[0]}` })
@@ -108,6 +135,7 @@
             const configureApiKey = function() {
                 let value = localStorage[LS_API_KEY];
                 let content = null;
+                let error = null;
 
                 function input(event) {
                     value = event.target.value;
@@ -118,9 +146,8 @@
                 }
 
                 async function check() {
-                    const data = await m.request({ url: `https://api.torn.com/key/?selections=info&key=${getApiKey()}` });
-
-                    const user = await m.request({ url: `https://api.torn.com/user/?selections=basic&key=${getApiKey()}` });
+                    const data = await tornGet("key", "info");
+                    const user = await tornGet("user", "basic");
 
                     content = m("div", [
                         m("p", ["API Key Access Level", m(accessLevelBadge, { level: data['access_type'] })]),
@@ -148,6 +175,17 @@
                     },
                     getValue: function() {
                         return value;
+                    },
+                    setError: function(err) {
+                        error = err;
+
+                        if(err) {
+                            content = [
+                                m("div", [
+                                    m("p", err)
+                                ])
+                            ]
+                        }
                     }
                 }
             }();
@@ -157,7 +195,7 @@
                 let content = null;
 
                 async function load() {
-                    const data = await m.request(`https://api.torn.com/torn/?selections=rankedwars&key=${getApiKey()}`);
+                    const data = await tornGet("torn", "rankedwars");
                     wars = Object.keys(data.rankedwars).map(id => {
                         return {
                             id,
@@ -214,7 +252,7 @@
                 async function load() {
                     localStorage[LS_FLYER_LAST_FACTION] = factionId;
                     const input = document.getElementById("flyer-faction-input");
-                    const data = await m.request({ url: `https://api.torn.com/faction/${factionId}?selections=basic&key=${getApiKey()}` });
+                    const data = await tornGet("faction", "basic");
 
                     content = [
                         m("h1", `Flyers for ${data.name}`),
