@@ -1,5 +1,6 @@
 <html>
     <head>
+        <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/base-min.css">
         <link rel="stylesheet" href="https://unpkg.com/purecss@2.1.0/build/pure-min.css" integrity="sha384-yHIFVG6ClnONEA5yB5DJXfW2/KC173DIQrYoZMEtBvGzmf0PKiGyNEqe9N6BNDBH" crossorigin="anonymous">
         <script src="https://unpkg.com/mithril/mithril.js"></script>
         <style>
@@ -309,6 +310,120 @@
                 }
             }();
 
+            const listFactionBalance = function() {
+                let loading = false;
+                let lastFundsReq = 0;
+                let user = null;
+                let donations = null;
+                let data = null;
+                let content = null;
+
+                function parseMoney(amount) {
+                    return Number.parseInt(amount.replace(/(\$|,)/g, ''));
+                }
+
+                function formatTransaction(amount) {
+                    return new Intl.NumberFormat([], { style: "currency", currency: "USD", currencyDisplay: 'narrowSymbol', signDisplay: 'always', maximumFractionDigits: 0 }).format(amount);
+                }
+
+                function formatMoney(amount) {
+                    return new Intl.NumberFormat([], { style: "currency", currency: "USD", currencyDisplay: 'narrowSymbol', signDisplay: 'auto', maximumFractionDigits: 0 }).format(amount);
+                }
+
+                function matchUserHtml(str) {
+                    const bankerMatch = str.match(/ID\=(?<id>\d*)\".*\>(?<name>.*)\</);
+
+                        return {
+                            name: bankerMatch.groups.name,
+                            id: bankerMatch.groups.id
+                        }
+                }
+
+                function parseNews(news) {
+                    if(news.news.indexOf("adjusted") > -1) {
+                        const match = news.news.match(/(?<banker>\<.*\>) adjusted (?<user>\<.*\>\'s) recorded .* from (?<start>\$[\d,]*) to (?<end>\$[\d,]*)/);
+                        const banker = matchUserHtml(match.groups.banker);
+                         
+                        return {
+                            type: "Adjustment",
+                            change: parseMoney(match.groups.end) - parseMoney(match.groups.start),
+                            balAfter: parseMoney(match.groups.end),
+                            byName: banker.name,
+                            byId: banker.id,
+                            timestamp: news.timestamp
+                        }
+                    }
+                }
+
+                function buildContent() {
+                    const current = donations.donations[user.player_id];
+                    const news = Object.entries(data.fundsnews).filter(([k , v]) => v.news.split("by")[0].indexOf(`XID=${user.player_id}`) > -1);
+
+                    content = m("table.pure-table-horizontal.pure-table-striped", 
+                        [m("tr", [m("th", "Timestamp (Local)"), m("th", "Type"), m("th", "Change"), m("th", "Balance"), m("th", "Banker")]), m("tr", m("td[colspan=5]", { class: loading ? null : "hidden" }, "Loading..."))].concat( 
+                        news.map(([id, n]) => parseNews(n)).sort((a, b) => b.timestamp - a.timestamp).map(entry => {
+
+                            return m("tr", [
+                                m("td", new Date(entry.timestamp * 1000).toLocaleString()),
+                                m("td", entry.type),
+                                m("td", formatTransaction(entry.change)),
+                                m("td", formatMoney(entry.balAfter)),
+                                m("td", entry.byName + entry.byId)
+                            ])
+                        }))
+                    );
+                }
+
+                async function waitForFundsCache() {
+                    const time = (lastFundsReq + 31 * 1000) - new Date().getTime();
+                    await new Promise(done => setTimeout(done, Math.max(0, time)));  // Wait for Torn API Cache to expire
+                }
+
+                async function load() {
+                    loading = true;
+                    user = await tornGet("user", "basic");
+                    donations = await tornGet("faction", "donations");
+                    i = 0;
+
+                    await waitForFundsCache();
+                    const baseTime = Math.round((new Date().getTime()) / 1000);
+                    let fromTime = Math.round((new Date().getTime() - 1000 * 86400 * 30) / 1000);
+                    let lastData = await tornGet("faction", "fundsnews", { to: baseTime, from: fromTime });
+                    lastFundsReq = new Date().getTime();
+                    data = lastData;
+                    while(Object.keys(lastData.fundsnews).length >= 1000) {
+                        buildContent();
+                        await waitForFundsCache();
+                        fromTime = Math.max(...Object.keys(lastData.fundsnews).map(id => lastData.fundsnews[id].timestamp));
+                        lastData = await tornGet("faction", "fundsnews", { to: baseTime, from: fromTime });
+                        data = { fundsnews: {...data.fundsnews, ...lastData.fundsnews}};
+                    }
+                    
+                    loading = false;
+
+                    buildContent();                    
+                }
+
+                function clear() {
+                    data = null;
+                    content = null;
+                }
+
+                return {
+                    view: function() {
+                        return [
+                            m("h2.content-subhead", ["Faction Balance Changes", accessLevelBadgeLimited]),
+                            m("button.pure-button[type=button]", { onclick: load }, !!data ? "Refresh" : "Load"),
+                            " ",
+                            m("button.pure-button[type=button]", { onclick: clear, class: !!content ? null : "hidden" }, "Clear"),
+                            m("br"),
+                            m("br"),
+                            m("div", content)
+                        ];
+                    }
+                }
+            }();
+
             function onReady() {
                 const root = document.querySelector("div.content");
                 m.mount(root, {
@@ -316,7 +431,8 @@
                         return [
                             m(configuration, [m(configureApiKey)]),
                             m(listRankedWars),
-                            m(listFactionFlyers)
+                            m(listFactionFlyers),
+                            m(listFactionBalance)
                         ];
                     }
                 });
