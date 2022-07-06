@@ -570,10 +570,27 @@
                 let content = null;
                 let userId = "";
                 let user = null;
+                const abortController = new AbortController();
                 
                 async function load() {
                     user = (await tornGet("user", userId, "basic"));
                     bazaar = (await tornGet("user", userId, "bazaar")).bazaar;
+
+                    for(let item of bazaar) {
+                        const delay = new Promise((resolve, reject) => {
+                            setTimeout(resolve, 1000);
+                            abortController.signal.onabort = () => {
+                                reject(new DOMException("Aborted waiting for Item Market Details", "AbortError"));
+                            };
+                        });  // Throttle requests
+
+                        await delay;
+                        const details = await tornGet("market", item.ID, "bazaar,itemmarket");
+                        item.lowest_price = Math.min(
+                            details.itemmarket.sort((a, b) => a.cost - b.cost)[0].cost,
+                            details.bazaar.sort((a, b) => a.cost - b.cost)[0].cost
+                        );
+                    }
 
                     content = [
                         m("h1", `Bazaar Price Check for ${user.name}`),
@@ -586,7 +603,7 @@
                                 m("td", formatMoney(item.price)),
                                 m("td", item.quantity),
                                 m("td", formatMoney(item.market_price)),
-                                m("td", formatMoney(0))
+                                m("td", formatMoney(item.lowest_price))
                             ])
                         }))
                     )];
@@ -595,6 +612,7 @@
                 function clear() {
                     bazaar = null;
                     content = null;
+                    abortController.abort();
                 }
 
                 function userIdInput(event) {
