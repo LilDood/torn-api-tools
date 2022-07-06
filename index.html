@@ -47,6 +47,9 @@
             table {
                 border-collapse: collapse;
             }
+            table.full-width {
+                width: 100%;
+            }
             td {
                 border: solid 1px black;
                 padding: 3px;
@@ -88,10 +91,10 @@
                 return configureApiKey.getValue();
             }
 
-            async function tornGet(endpoint, selections, params) {
+            async function tornGet(endpoint, id, selections, params) {
                 const url = new URL("https://api.torn.com");
 
-                url.pathname = endpoint
+                url.pathname = !!id ? `${endpoint}/${id}` : endpoint;
                 url.searchParams.append("key", configureApiKey.getValue());
                 url.searchParams.append("selections", selections);
 
@@ -147,8 +150,8 @@
                 }
 
                 async function check() {
-                    const data = await tornGet("key", "info");
-                    const user = await tornGet("user", "basic");
+                    const data = await tornGet("key", null, "info");
+                    const user = await tornGet("user", null, "basic");
 
                     content = m("div", [
                         m("p", ["API Key Access Level", m(accessLevelBadge, { level: data['access_type'] })]),
@@ -196,7 +199,7 @@
                 let content = null;
 
                 async function load() {
-                    const data = await tornGet("torn", "rankedwars");
+                    const data = await tornGet("torn", null, "rankedwars");
                     wars = Object.keys(data.rankedwars).map(id => {
                         return {
                             id,
@@ -253,7 +256,7 @@
                 async function load() {
                     localStorage[LS_FLYER_LAST_FACTION] = factionId;
                     const input = document.getElementById("flyer-faction-input");
-                    const data = await tornGet("faction", "basic");
+                    const data = await tornGet("faction", null, "basic");
 
                     content = [
                         m("h1", `Flyers for ${data.name}`),
@@ -312,11 +315,14 @@
 
             const listFactionBalance = function() {
                 let loading = false;
+                let loadingInterval = null;
                 let lastFundsReq = 0;
+                let userId = "";
                 let user = null;
                 let donations = null;
                 let data = null;
                 let content = null;
+                const abortController = new AbortController();
 
                 function parseMoney(amount) {
                     return Number.parseInt(amount.replace(/(\$|,)/g, ''));
@@ -331,18 +337,22 @@
                 }
 
                 function matchUserHtml(str) {
-                    const bankerMatch = str.match(/ID\=(?<id>\d*)\".*\>(?<name>.*)\</);
+                    const match = str.match(/ID\=(?<id>\d*)\"?.*\>(?<name>.*)\</);
+                    
+                    if(!match) console.log("Bad User HTML Match", str);
 
-                        return {
-                            name: bankerMatch.groups.name,
-                            id: bankerMatch.groups.id
-                        }
+                    return {
+                        name: match.groups.name,
+                        id: match.groups.id
+                    }
                 }
-
+ 
                 function parseNews(news) {
                     if(news.news.indexOf("adjusted") > -1) {
-                        const match = news.news.match(/(?<banker>\<.*\>) adjusted (?<user>\<.*\>\'s) recorded .* from (?<start>\$[\d,]*) to (?<end>\$[\d,]*)/);
+                        const match = news.news.match(/(?<banker>\<.*\>) adjusted (?<user>\<.*\>\'s) recorded .* from (?<start>\$\-?[\d,]*) to (?<end>\$\-?[\d,]*)/);
+                        if(!match) console.log("Bad adjust match", news);
                         const banker = matchUserHtml(match.groups.banker);
+                        const accountHolder = matchUserHtml(match.groups.user);
                          
                         return {
                             type: "Adjustment",
@@ -350,55 +360,174 @@
                             balAfter: parseMoney(match.groups.end),
                             byName: banker.name,
                             byId: banker.id,
+                            userName: accountHolder.name,
+                            userId: accountHolder.id,
                             timestamp: news.timestamp
+                        }
+                    }
+
+                    if(news.news.indexOf("deposited") > -1) {
+                        const match = news.news.match(/(?<user>\<.*\>) deposited (?<change>\$[\d,]*)/);
+                        if(!match) console.log("Bad deposit match", news);
+                        const accountHolder = matchUserHtml(match.groups.user);
+                         
+                        return {
+                            type: "Deposit",
+                            change: parseMoney(match.groups.change),
+                            balAfter: null,
+                            byName: "N/A",
+                            byId: -1,
+                            userName: accountHolder.name,
+                            userId: accountHolder.id,
+                            timestamp: news.timestamp
+                        }
+                    }
+
+                    if(news.news.indexOf("given") > -1) {
+                        const match = news.news.match(/(?<user>\<.*\>) was given (?<change>\$[\d,]*).* by (?<banker>\<.*\>)/);
+                        if(!match) console.log("Bad given match", news);
+                        const banker = matchUserHtml(match.groups.banker);
+                        const accountHolder = matchUserHtml(match.groups.user);
+                         
+                        return {
+                            type: "Withdrawal",
+                            change: -parseMoney(match.groups.change),
+                            balAfter: null,
+                            byName: banker.name,
+                            byId: banker.id,
+                            userName: accountHolder.name,
+                            userId: accountHolder.id,
+                            timestamp: news.timestamp
+                        }
+                    }
+
+                    // Ignore "Paid" events
+
+                    return {};
+                }
+
+                function filterNews(targetId) {
+                    return ([k, v]) => {
+                        const action = v.news.match(/\<\/a\>\s(?<action>adjusted|deposited|was given|was paid)/);
+                        const ids = v.news.match(/XID\=(?<id>\d+)/g);
+
+                        if(!action || !ids) {
+                            console.error("Bad funds news", k, v);
+                        }
+                        
+                        if(action.groups.action === "adjusted") {
+                            return ids[1].indexOf(`XID=${targetId}`) > -1;
+                        }else{
+                            // Deposited, Paid & Given By have Balance Holder first
+                            return ids[0].indexOf(`XID=${targetId}`) > -1;
                         }
                     }
                 }
 
-                function buildContent() {
-                    const current = donations.donations[user.player_id];
-                    const news = Object.entries(data.fundsnews).filter(([k , v]) => v.news.split("by")[0].indexOf(`XID=${user.player_id}`) > -1);
+                function replayTransactions(transactions) {
+                    // Play through transaction data forward & back to fill in balance numbers where we only have change amounts
 
-                    content = m("table.pure-table-horizontal.pure-table-striped", 
-                        [m("tr", [m("th", "Timestamp (Local)"), m("th", "Type"), m("th", "Change"), m("th", "Balance"), m("th", "Banker")]), m("tr", m("td[colspan=5]", { class: loading ? null : "hidden" }, "Loading..."))].concat( 
-                        news.map(([id, n]) => parseNews(n)).sort((a, b) => b.timestamp - a.timestamp).map(entry => {
+                    let lastBalance = null;
 
-                            return m("tr", [
-                                m("td", new Date(entry.timestamp * 1000).toLocaleString()),
-                                m("td", entry.type),
-                                m("td", formatTransaction(entry.change)),
-                                m("td", formatMoney(entry.balAfter)),
-                                m("td", entry.byName + entry.byId)
-                            ])
-                        }))
-                    );
+                    if(!loading) {
+                        const donation = donations.donations[user.player_id];
+                        if(donation) {
+                            lastBalance = donation.money_balance;
+                        }
+                        console.log("Starting Forward Balance", lastBalance);
+                    }
+
+                    for(let entry of transactions) {
+                        if(!!lastBalance && !entry.balAfter) {
+                            entry.balAfter = lastBalance;
+                        }
+
+                        if(entry.balAfter) {
+                            lastBalance = entry.balAfter - entry.change;
+                        }
+                    }
+
+                    return transactions;
                 }
 
-                async function waitForFundsCache() {
-                    const time = (lastFundsReq + 31 * 1000) - new Date().getTime();
-                    await new Promise(done => setTimeout(done, Math.max(0, time)));  // Wait for Torn API Cache to expire
+                function buildContent() {
+                    // Filter news by player id, or default to an empty array if we don't have data
+                    const news = !!data ? Object.entries(data.fundsnews).filter(filterNews(user.player_id)) : [];
+
+                    const transactions = replayTransactions(news.map(([id, n]) => parseNews(n)).sort((a, b) => b.timestamp - a.timestamp));
+
+                    content = m("table.pure-table-horizontal.pure-table-striped.full-width", [
+                            m("tr", [
+                                m("th", "Timestamp (Local)"), 
+                                m("th", "Type"),
+                                m("th", "Change"), 
+                                m("th", "Balance"), 
+                                m("th", "User"), 
+                                m("th", "Banker")
+                            ]), 
+                            m("tr", m("td[colspan=6]", { class: loading ? null : "hidden" }, `Loading... ${Math.floor(timeToWait() / 1000)}s`))
+                        ].concat( 
+                            transactions.map(entry => {
+                                
+                                return m("tr", [
+                                    m("td", new Date(entry.timestamp * 1000).toLocaleString()),
+                                    m("td", entry.type),
+                                    m("td", formatTransaction(entry.change)),
+                                    m("td", formatMoney(entry.balAfter)),
+                                    m("td", entry.userName + entry.userId),
+                                    m("td", entry.byName + entry.byId)
+                                ])
+                            })
+                        )
+                    );
+                    // Force update in case this is called from a timer
+                    m.redraw();
+                }
+
+                function timeToWait() {
+                    return Math.max(0, (lastFundsReq + 31 * 1000) - new Date().getTime());
+                }
+
+                async function waitForFundsCache(abort) {
+                    const time = timeToWait();
+                    const p = new Promise((resolve, reject) => {
+                        setTimeout(resolve, Math.max(0, time));
+                        abort.signal.onabort = () => {
+                            reject(new DOMException("Aborted waiting for Funds", "AbortError"));
+                        };
+                    });  // Wait for Torn API Cache to expire
+                    return p;
                 }
 
                 async function load() {
-                    loading = true;
-                    user = await tornGet("user", "basic");
-                    donations = await tornGet("faction", "donations");
-                    i = 0;
+                    if (loading) return;
 
-                    await waitForFundsCache();
+                    loading = true;
+                    loadingInterval = setInterval(() => buildContent(), 1000); // Update time left to wait
+                    user = await tornGet("user", !!userId ? userId : null, "basic"); // Default to API Key owner if no User ID
+                    donations = await tornGet("faction", null, "donations");
+
+                    buildContent();
+                    await waitForFundsCache(abortController); // Wait 30 seconds for the API cache so we get different data in the response
+
                     const baseTime = Math.round((new Date().getTime()) / 1000);
-                    let fromTime = Math.round((new Date().getTime() - 1000 * 86400 * 30) / 1000);
-                    let lastData = await tornGet("faction", "fundsnews", { to: baseTime, from: fromTime });
+                    let fromTime = Math.round((new Date().getTime() - 1000 * 86400 * 30) / 1000); // 30 days of data
+                    let lastData = await tornGet("faction", null, "fundsnews", { to: baseTime, from: fromTime });
                     lastFundsReq = new Date().getTime();
                     data = lastData;
-                    while(Object.keys(lastData.fundsnews).length >= 1000) {
+
+                    // Responses appear to be limited to 1000 items, so assume there is more data to fetch if we're given 1000 items
+                    while(Object.keys(lastData.fundsnews).length >= 1000 && loading) {
                         buildContent();
-                        await waitForFundsCache();
+                        await waitForFundsCache(abortController);
+                        // Get next batch based on newest item that was just returned
                         fromTime = Math.max(...Object.keys(lastData.fundsnews).map(id => lastData.fundsnews[id].timestamp));
-                        lastData = await tornGet("faction", "fundsnews", { to: baseTime, from: fromTime });
+                        lastData = await tornGet("faction", null, "fundsnews", { to: baseTime, from: fromTime });
                         data = { fundsnews: {...data.fundsnews, ...lastData.fundsnews}};
                     }
                     
+                    clearInterval(loadingInterval);
+                    loadingInterval = null;
                     loading = false;
 
                     buildContent();                    
@@ -407,15 +536,27 @@
                 function clear() {
                     data = null;
                     content = null;
+                    clearInterval(loadingInterval);
+                    loadingInterval = null;
+                    abortController.abort();
+                    loading = false;
+                }
+
+                function userIdInput(event) {
+                    userId = event.target.value;
                 }
 
                 return {
                     view: function() {
                         return [
                             m("h2.content-subhead", ["Faction Balance Changes", accessLevelBadgeLimited]),
-                            m("button.pure-button[type=button]", { onclick: load }, !!data ? "Refresh" : "Load"),
-                            " ",
-                            m("button.pure-button[type=button]", { onclick: clear, class: !!content ? null : "hidden" }, "Clear"),
+                            m("form[class=pure-form]", [
+                                m("input[name=factionBalanceUserId]", { oninput: userIdInput, value: userId }),
+                                " ",
+                                m("button.pure-button[type=button]", { onclick: load }, !!data ? "Refresh" : "Load"),
+                                " ",
+                                m("button.pure-button[type=button]", { onclick: clear, class: !!content ? null : "hidden" }, "Clear")
+                            ]),
                             m("br"),
                             m("br"),
                             m("div", content)
