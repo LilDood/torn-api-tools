@@ -194,6 +194,10 @@
                 }
             }();
 
+            function formatMoney(amount) {
+                return new Intl.NumberFormat([], { style: "currency", currency: "USD", currencyDisplay: 'narrowSymbol', signDisplay: 'auto', maximumFractionDigits: 0 }).format(amount);
+            }
+
             const listRankedWars = function() {
                 let wars = null;
                 let content = null;
@@ -330,10 +334,6 @@
 
                 function formatTransaction(amount) {
                     return new Intl.NumberFormat([], { style: "currency", currency: "USD", currencyDisplay: 'narrowSymbol', signDisplay: 'always', maximumFractionDigits: 0 }).format(amount);
-                }
-
-                function formatMoney(amount) {
-                    return new Intl.NumberFormat([], { style: "currency", currency: "USD", currencyDisplay: 'narrowSymbol', signDisplay: 'auto', maximumFractionDigits: 0 }).format(amount);
                 }
 
                 function matchUserHtml(str) {
@@ -565,6 +565,59 @@
                 }
             }();
 
+            const checkBazaarPrices = function() {
+                let bazaar = null;
+                let content = null;
+                let userId = "";
+                let user = null;
+                
+                async function load() {
+                    user = (await tornGet("user", userId, "basic"));
+                    bazaar = (await tornGet("user", userId, "bazaar")).bazaar;
+
+                    content = [
+                        m("h1", `Bazaar Price Check for ${user.name}`),
+                        m("table.pure-table-horizontal.pure-table-striped.full-width", 
+                        [m("tr", [m("th", "Item"), m("th", "Price"), m("th", "Quantity"), m("th", "Market Price"), m("th", "Lowest")])].concat( 
+                        bazaar.map(item => {
+
+                            return m("tr", [
+                                m("td", item.name),
+                                m("td", formatMoney(item.price)),
+                                m("td", item.quantity),
+                                m("td", formatMoney(item.market_price)),
+                                m("td", formatMoney(0))
+                            ])
+                        }))
+                    )];
+                }
+
+                function clear() {
+                    bazaar = null;
+                    content = null;
+                }
+
+                function userIdInput(event) {
+                    userId = event.target.value;
+                }
+
+                return {
+                    view: function() {
+                        return [
+                            m("h2.content-subhead", ["Bazaar Price Check", accessLevelBadgePublic]),
+                            m("form[class=pure-form]", [
+                                m("input[name=factionBalanceUserId]", { oninput: userIdInput, value: userId }),
+                                " ",
+                                m("button.pure-button[type=button]", { onclick: load }, !!bazaar ? "Refresh" : "Load"),
+                                " ",
+                                m("button.pure-button[type=button]", { onclick: clear, class: !!content ? null : "hidden" }, "Clear")
+                            ]),
+                            m("div", content)
+                        ];
+                    }
+                }
+            }();
+
             function onReady() {
                 const root = document.querySelector("div.content");
                 m.mount(root, {
@@ -573,7 +626,8 @@
                             m(configuration, [m(configureApiKey)]),
                             m(listRankedWars),
                             m(listFactionFlyers),
-                            m(listFactionBalance)
+                            m(listFactionBalance),
+                            m(checkBazaarPrices)
                         ];
                     }
                 });
