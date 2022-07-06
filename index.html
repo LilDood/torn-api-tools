@@ -567,14 +567,20 @@
 
             const checkBazaarPrices = function() {
                 let bazaar = null;
+                let items = {};
                 let content = null;
                 let userId = "";
                 let user = null;
+                let loading = false;
                 const abortController = new AbortController();
                 
                 async function load() {
+                    items = {};
+                    loading = true;
                     user = (await tornGet("user", userId, "basic"));
                     bazaar = (await tornGet("user", userId, "bazaar")).bazaar;
+
+                    buildContent();
 
                     for(let item of bazaar) {
                         const delay = new Promise((resolve, reject) => {
@@ -586,16 +592,40 @@
 
                         await delay;
                         const details = await tornGet("market", item.ID, "bazaar,itemmarket");
-                        item.lowest_price = Math.min(
-                            details.itemmarket.sort((a, b) => a.cost - b.cost)[0].cost,
-                            details.bazaar.sort((a, b) => a.cost - b.cost)[0].cost
-                        );
+                        items[item.ID] = details;
+
+                        const bazaarLow = details.bazaar.sort((a, b) => a.cost - b.cost)[0];
+                        const marketLow = details.itemmarket.sort((a, b) => a.cost - b.cost)[0];
+
+                        if((bazaarLow.cost || 10e12) < (marketLow.cost || 10e12)) {
+                            item.lowest_price = bazaarLow.cost;
+                            item.lowest_price_quantity = bazaarLow.quantity;
+                        }else{
+                            item.lowest_price = marketLow.cost;
+                            item.lowest_price_quantity = marketLow.quantity;
+                        }
+
+                        buildContent();
                     }
 
+                    loading = false;
+                    buildContent();
+                }
+
+                function buildContent() {
                     content = [
                         m("h1", `Bazaar Price Check for ${user.name}`),
                         m("table.pure-table-horizontal.pure-table-striped.full-width", 
-                        [m("tr", [m("th", "Item"), m("th", "Price"), m("th", "Quantity"), m("th", "Market Price"), m("th", "Lowest")])].concat( 
+                        [
+                            m("tr", [
+                                m("th", "Item"), 
+                                m("th", "Price"), 
+                                m("th", "Quantity"), 
+                                m("th", "Market Price"), 
+                                m("th", "Lowest")
+                            ]),
+                            m("tr", m("td[colspan=5]", { class: loading ? null : "hidden" }, `Loading...`))
+                        ].concat( 
                         bazaar.map(item => {
 
                             return m("tr", [
@@ -603,7 +633,7 @@
                                 m("td", formatMoney(item.price)),
                                 m("td", item.quantity),
                                 m("td", formatMoney(item.market_price)),
-                                m("td", formatMoney(item.lowest_price))
+                                m("td", item.lowest_price ? `${formatMoney(item.lowest_price)} x ${item.lowest_price_quantity}` : "Loading...")
                             ])
                         }))
                     )];
@@ -611,7 +641,9 @@
 
                 function clear() {
                     bazaar = null;
+                    items = {};
                     content = null;
+                    loading = false;
                     abortController.abort();
                 }
 
