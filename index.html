@@ -594,8 +594,8 @@
                         const details = await tornGet("market", item.ID, "bazaar,itemmarket");
                         items[item.ID] = details;
 
-                        const bazaarLow = details.bazaar.sort((a, b) => a.cost - b.cost)[0];
-                        const marketLow = details.itemmarket.sort((a, b) => a.cost - b.cost)[0];
+                        const bazaarLow = details.bazaar ? details.bazaar.sort((a, b) => a.cost - b.cost)[0] : null;
+                        const marketLow = details.itemmarket ? details.itemmarket.sort((a, b) => a.cost - b.cost)[0] : null;
 
                         if((bazaarLow.cost || 10e12) < (marketLow.cost || 10e12)) {
                             item.lowest_price = bazaarLow.cost;
